@@ -2,93 +2,151 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Калькулятор секвенирования</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>NGS Calculator</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-    .form-group { margin: 1rem 0; }
-    label { display: block; margin-bottom: 0.3rem; font-weight: 500; }
-    select, input { width: 100%; padding: 0.5rem; font-size: 1rem; box-sizing: border-box; }
-    .result { background: #f0f7ff; padding: 1rem; border-radius: 6px; margin-top: 1.5rem; }
-    .result h3 { margin-top: 0; }
-    .hint { font-size: 0.85em; color: #666; margin-top: 0.2rem; }
-    @media (prefers-color-scheme: dark) {
-      body { background: #1a1a2e; color: #eee; }
-      .result { background: #16213e; }
-      select, input { background: #0f3460; color: #eee; border: 1px solid #444; }
-      .hint { color: #aaa; }
+    :root {
+      --bg-body: #f4f6f9; --bg-card: #ffffff; --text-main: #1f2937; --text-secondary: #6b7280;
+      --primary: #3b82f6; --primary-hover: #2563eb; --border: #e5e7eb;
+      --radius-lg: 16px; --radius-md: 10px;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
     }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-body: #111827; --bg-card: #1f2937; --text-main: #f3f4f6; --text-secondary: #9ca3af;
+        --border: #374151; --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+      }
+      select, input { background: #374151 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
+      .read-length-box { background: #172554; color: #93c5fd; border-color: #1e3a8a; }
+      .result { background: #022c22; border-color: #064e3b; color: #a7f3d0; }
+      .result h3 { color: #6ee7b7; }
+      .info-header { background: #374151; border-color: #4b5563; }
+      .tag { background: #312e81; color: #a5b4fc; }
+    }
+
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; padding: 2rem 1rem; line-height: 1.5; }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { text-align: center; font-size: 1.75rem; font-weight: 800; margin-bottom: 1.5rem; background: linear-gradient(135deg, var(--primary), #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    
+    .card { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 2rem; }
+    .form-group { margin-bottom: 1.25rem; }
+    label { display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.9rem; color: var(--text-secondary); }
+    
+    input, select {
+      width: 100%; padding: 0.75rem 1rem; font-size: 1rem; border: 1px solid var(--border); border-radius: var(--radius-md);
+      background: #fff; color: var(--text-main); transition: all 0.2s; box-sizing: border-box; cursor: pointer;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+    
+    select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+    @media (prefers-color-scheme: dark) { select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); } }
+
+    .input-group { display: flex; gap: 0.5rem; }
+    .input-group input { flex: 2; }
+    .input-group select { flex: 1; min-width: 80px; }
+
+    .read-length-box { background: #eff6ff; color: #1e40af; padding: 0.8rem 1rem; border-radius: var(--radius-md); text-align: center; font-weight: 700; margin-bottom: 1.5rem; border: 1px solid #bfdbfe; }
+    .read-length-box small { font-weight: 400; font-size: 0.85em; opacity: 0.8; display: block; margin-top: 4px; }
+
+    button { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: 700; color: white; background: var(--primary); border: none; border-radius: 50px; cursor: pointer; transition: transform 0.1s, background 0.2s; box-shadow: 0 4px 6px rgba(37,99,235,0.3); }
+    button:hover { background: var(--primary-hover); transform: translateY(-1px); } button:active { transform: translateY(1px); }
+
+    .result { margin-top: 1.5rem; padding: 1.25rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); display: none; }
+    .result h3 { margin: 0 0 1rem 0; color: #166534; font-size: 1.1rem; }
+    .result p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
+    .result .highlight { font-size: 1.4rem; font-weight: 800; color: var(--primary); text-align: center; display: block; margin: 1rem 0; }
+    
+    .info-card { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 2rem; }
+    .info-header { padding: 1rem 1.25rem; background: #f9fafb; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--text-secondary); }
+    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 350px; }
+    th, td { padding: 0.8rem 1.25rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { font-weight: 600; color: var(--text-secondary); background: rgba(0,0,0,0.02); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #e0e7ff; color: #3730a3; }
+    .hint { font-size: 0.8em; color: var(--text-secondary); margin-top: 0.3rem; }
   </style>
 </head>
 <body>
-  <h1>🧬 Калькулятор секвенирования</h1>
+  <div class="container">
+    <h1>🧬 NGS Calculator</h1>
+    <div class="card">
+      <div class="form-group">
+        <label for="platform">Платформа</label>
+        <select id="platform"></select>
+      </div>
+      <div class="form-group">
+        <label for="instrument">Инструмент</label>
+        <select id="instrument" disabled></select>
+      </div>
+      <div class="form-group">
+        <label for="flowcell">Набор для секвенирования</label>
+        <select id="flowcell" disabled></select>
+      </div>
+      <div class="form-group">
+        <label for="cycles">Количество циклов</label>
+        <select id="cycles" disabled></select>
+      </div>
+      
+      <div class="form-group">
+        <label for="mode">Режим секвенирования</label>
+        <select id="mode">
+          <option value="SE">Single End (SE)</option>
+          <option value="PE" selected>Paired End (PE)</option>
+        </select>
+      </div>
 
-  <div class="form-group">
-    <label for="platform">Платформа</label>
-    <select id="platform"></select>
+      <div class="read-length-box" id="readLengthDisplay">— п.н.<small>Расчётная длина рида</small></div>
+      <hr style="border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0;">
+
+      <div class="form-group">
+        <label for="targetSizeInput">Размер таргетной области / Количество прочтений на образец</label>
+        <div class="input-group">
+          <input type="number" id="targetSizeInput" step="0.001" min="0.001" placeholder="Введите значение" />
+          <select id="targetUnit">
+            <option value="Mb" selected>Мб</option>
+            <option value="Gb">Гб</option>
+            <option value="Mreads">Млн ридов</option>
+          </select>
+        </div>
+        <div class="hint" id="targetHint">💡 По умолчанию в Мб</div>
+      </div>
+
+      <div class="form-group" id="coverageGroup">
+        <label for="desiredCoverage">Желаемое покрытие (X)</label>
+        <input type="number" id="desiredCoverage" step="1" min="1" placeholder="Например: 30 для WGS" />
+      </div>
+
+      <button id="calcBtn">Рассчитать ёмкость</button>
+
+      <div class="result" id="output">
+        <h3>📊 Результаты</h3>
+        <p><span>Выход с ячейки:</span> <strong id="res-total-gb">—</strong></p>
+        <p><span>Длина рида:</span> <strong id="res-readlen">—</strong></p>
+        <p><span>Данных на образец:</span> <strong id="res-gb-per-sample">—</strong></p>
+        <p><span>Использованное покрытие:</span> <strong id="res-coverage-input">—</strong></p>
+        <span class="highlight"><span id="res-samples">0</span> образцов</span>
+        <p id="remaining-row"><span>Остаток:</span> <span id="res-remaining">—</span></p>
+        <p id="reverse-row" style="display:none; margin-top:1rem; padding-top:0.5rem; border-top:1px dashed var(--border); font-size:0.9em; color:var(--text-secondary);">
+          💡 При <b id="res-custom-samples"></b> обр. покрытие ~<b id="res-achieved-coverage"></b>X
+        </p>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="info-header">📋 Типовые задачи</div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Тип</th><th>Размер</th><th>Покрытие</th><th>Мб</th></tr></thead>
+          <tbody>
+            <tr><td><b>WGS</b> (Человек)</td><td><span class="tag">3.2 Гб</span></td><td>30x-50x</td><td>3 200</td></tr>
+            <tr><td><b>WES</b> (Экзом)</td><td><span class="tag">~50 Мб</span></td><td>100x</td><td>50</td></tr>
+            <tr><td><b>WTS</b> (Транскриптом)</td><td>Variable</td><td>20-40M reads</td><td>~3-5K</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p style="text-align:center; margin-top:2rem; font-size:0.8rem; color:var(--text-secondary);">v1.3 | MIT License | Open Source</p>
   </div>
-
-  <div class="form-group">
-    <label for="instrument">Инструмент</label>
-    <select id="instrument" disabled>
-      <option value="">Сначала выберите платформу</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label for="flowcell">Flow Cell / Ячейка</label>
-    <select id="flowcell" disabled>
-      <option value="">Сначала выберите инструмент</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label for="cycles">Доступные циклы (пресет)</label>
-    <select id="cycles" disabled>
-      <option value="">Сначала выберите flow cell</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label for="mode">Режим секвенирования</label>
-    <select id="mode">
-      <option value="SE">Single End (SE)</option>
-      <option value="PE" selected>Paired End (PE)</option>
-    </select>
-  </div>
-
-  <div class="form-group" style="background:#eef2f7; padding:0.8rem; border-radius:6px;">
-    <label style="font-size:0.9em; color:#555;">📏 Расчётная длина рида</label>
-    <div id="readLengthDisplay" style="font-size:1.2em; font-weight:bold; margin-top:0.2rem;">— п.н.</div>
-  </div>
-
-  <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #ddd;">
-
-  <div class="form-group">
-    <label for="targetSizeGb">Размер целевой области на образец (Гб)</label>
-    <input type="number" id="targetSizeGb" step="0.1" min="0.001" placeholder="Например: 3.2 для WGS человека"/>
-    <div class="hint">💡 1 Мб = 0.001 Гб. Для WGS человека (~3.2 Гб) введите 3.2</div>
-  </div>
-
-  <div class="form-group">
-    <label for="desiredCoverage">Желаемое среднее покрытие (X)</label>
-    <input type="number" id="desiredCoverage" step="1" min="1" placeholder="Например: 30 для WGS, 100 для панелей"/>
-  </div>
-
-  <button id="calcBtn">Рассчитать</button>
-
-  <div class="result" id="output" style="display:none">
-    <h3>📊 Результаты</h3>
-    <p><strong>Выход с ячейки:</strong> <span id="res-total-gb"></span> Гб</p>
-    <p><strong>Длина рида:</strong> <span id="res-readlen"></span> п.н.</p>
-    <p><strong>Данных на образец:</strong> <span id="res-gb-per-sample"></span> Гб (при покрытии <span id="res-coverage-input"></span>X)</p>
-    <p style="font-size:1.3em; margin:1rem 0;"><strong>🎯 Макс. образцов на ячейку:</strong> <span id="res-samples" style="color:#2563eb;"></span></p>
-    <p id="remaining-row"><strong>Остаток данных:</strong> <span id="res-remaining"></span> Гб</p>
-    <p id="reverse-row" style="display:none; margin-top:1rem; padding-top:0.5rem; border-top:1px dashed #ccc;">
-      <small>💡 Если запустить <strong id="res-custom-samples"></strong> образцов, покрытие составит ~<strong id="res-achieved-coverage"></strong>X</small>
-    </p>
-  </div>
-
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
