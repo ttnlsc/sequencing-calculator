@@ -1,6 +1,14 @@
-// js/app.js
 import { platforms } from './data.js';
-import { calculateGigabasesFromCycles, calculateSampleCapacity, calculateAchievedCoverage, getEffectiveReadLength } from './calculator.js';
+import { 
+  calculateGigabasesFromCycles, 
+  calculateSampleCapacity, 
+  calculateAchievedCoverage, 
+  getEffectiveReadLength,
+  calculateEffectiveGb,
+  ngToNmol,
+  calculateDilution,
+  calculateFromMode
+} from './calculator.js';
 
 function getEl(id) {
   const el = document.getElementById(id);
@@ -11,20 +19,39 @@ function getEl(id) {
 const els = {
   platform: getEl('platform'), instrument: getEl('instrument'), flowcell: getEl('flowcell'),
   cycles: getEl('cycles'), mode: getEl('mode'), readLenDisplay: getEl('readLengthDisplay'),
-  targetSizeInput: getEl('targetSizeInput'), targetUnit: getEl('targetUnit'), targetHint: getEl('targetHint'),
-  coverageGroup: getEl('coverageGroup'), desiredCoverage: getEl('desiredCoverage'),
-  calcBtn: getEl('calcBtn'), output: getEl('output'), resTotalGb: getEl('res-total-gb'),
+  planMode: getEl('planMode'), modeHint: getEl('modeHint'),
+  panelSize: getEl('panelSize'), panelSizeUnit: getEl('panelSizeUnit'), panelCov: getEl('panelCov'),
+  panelAmpCount: getEl('panelAmpCount'), panelAmpCov: getEl('panelAmpCov'),
+  panelDataSize: getEl('panelDataSize'), panelDataUnit: getEl('panelDataUnit'),
+  panelReads: getEl('panelReads'),
+    // Доп. параметры (качество)
+  advancedToggle: getEl('toggleAdvanced'), advancedPanel: getEl('advancedPanel'),
+  pctDuplicates: getEl('pctDuplicates'), pctQ30: getEl('pctQ30'),
+  // Кнопка и результаты
+  calcBtn: getEl('calcBtn'), output: getEl('output'), 
+  resTotalGb: getEl('res-total-gb'), resEffectiveGb: getEl('res-effective-gb'),
   resReadLen: getEl('res-readlen'), resGbPerSample: getEl('res-gb-per-sample'),
-  resCoverageInput: getEl('res-coverage-input'), resSamples: getEl('res-samples'),
-  resRemaining: getEl('res-remaining'), reverseRow: getEl('reverse-row'),
-  resCustomSamples: getEl('res-custom-samples'), resAchievedCoverage: getEl('res-achieved-coverage')
+  resSamples: getEl('res-samples'), resRemaining: getEl('res-remaining'), 
+  reverseRow: getEl('reverse-row'), resCustomSamples: getEl('res-custom-samples'), 
+  resAchievedCoverage: getEl('res-achieved-coverage'),
+  // Калькулятор молярности
+  fragLength: getEl('fragLength'), libConcNg: getEl('libConcNg'), convertBtn: getEl('convertBtn'),
+  poolResult: getEl('poolResult'), resNm: getEl('res-nm'), targetNm: getEl('targetNm'),
+  diluteBtn: getEl('diluteBtn'), dilutionResult: getEl('dilutionResult'), resVolBuffer: getEl('res-vol-buffer'),
+  stockVol: getEl('stockVol'), resVolFinal: getEl('res-vol-final'), resDilFactor: getEl('res-dil-factor'),
+  // Сворачивание таблицы
+  toggleTable: getEl('toggleTable'), tableContent: getEl('tableContent'),
+  // Подготовка к запуску
+  runPrepCard: getEl('run-prep-card'), targetLoadingPm: getEl('targetLoadingPm'),
+  calcRunBtn: getEl('calcRunBtn'), runPrepResult: getEl('runPrepResult'),
+  resLibVol: getEl('res-lib-vol'), resHybVol: getEl('res-hyb-vol')
 };
 
 function showError(msg) {
   console.error('❌', msg);
   const banner = document.createElement('div');
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fee;color:#b00;padding:1rem;text-align:center;z-index:9999;font-weight:bold;';
-  banner.textContent = `⚠️ Ошибка загрузки: ${msg}. Проверьте консоль (F12).`;
+  banner.textContent = `Ошибка загрузки: ${msg}. Проверьте консоль (F12).`;
   document.body.prepend(banner);
 }
 
@@ -39,18 +66,8 @@ function convertToGb(value, unit, readLen, mode) {
   return 0;
 }
 
-function updateHint() {
-  const u = els.targetUnit?.value;
-  const hints = {
-    'Mb': '💡 1 Мб = 0.001 Гб. Для WGS (~3.2 Гб) введите 3200',
-    'Gb': '💡 Для WGS человека введите ~3.2',
-    'Mreads': '💡 Введите требуемое кол-во ридов на образец (покрытие не нужно)'
-  };
-  if (els.targetHint) els.targetHint.textContent = hints[u] || '';
-}
-
 try {
-  console.log('🚀 Запуск NGS Calculator...');
+  console.log('Запуск NGS Calculator...');
   if (!els.platform || !els.instrument || !els.mode) {
     throw new Error('Критические элементы формы не найдены в HTML. Проверьте id.');
   }
@@ -62,17 +79,104 @@ try {
     els.platform.appendChild(opt);
   }
 
-  // Привязываем события
   els.platform.addEventListener('change', updateInstruments);
-  els.instrument.addEventListener('change', updateFlowcells);
+  els.instrument.addEventListener('change', () => { updateFlowcells(); updatePrepCardVisibility(); });
   els.flowcell.addEventListener('change', updateCycles);
   els.cycles.addEventListener('change', updateReadLengthPreview);
-  els.mode.addEventListener('change', () => { updateReadLengthPreview(); calculate(); });
-  els.targetUnit.addEventListener('change', () => { updateHint(); calculate(); });
-  [els.cycles, els.mode, els.targetSizeInput, els.desiredCoverage].forEach(el => {
-    if (el) el.addEventListener('input', calculate);
-  });
+  els.mode.addEventListener('change', updateReadLengthPreview);
+
+  // Переключение режимов планирования
+  if (els.planMode) {
+    els.planMode.addEventListener('change', () => {
+      document.querySelectorAll('.input-panel').forEach(p => p.classList.remove('active'));
+      const activePanel = document.getElementById(`panel-${els.planMode.value}`);
+      if (activePanel) activePanel.classList.add('active');
+      
+      const hints = {
+        size_cov: 'Введите размер таргета и желаемое покрытие',
+        amplicons: 'Укажите кол-во ампликонов, их среднюю длину и покрытие',
+        data: 'Введите объём данных, который вы планируете получить на образец',
+        reads: 'Введите количество млн ридов на образец'
+      };
+      if (els.modeHint) els.modeHint.textContent = hints[els.planMode.value] || '';
+    });
+  }
+
   if (els.calcBtn) els.calcBtn.addEventListener('click', calculate);
+
+   // Сворачивание доп. параметров
+  if (els.advancedToggle && els.advancedPanel) {
+    els.advancedToggle.addEventListener('click', () => {
+      els.advancedPanel.classList.toggle('visible');
+      const isVis = els.advancedPanel.classList.contains('visible');
+      els.advancedToggle.innerHTML = `Дополнительные параметры ${isVis ? '▲' : '▼'}`;
+    });
+  }
+  
+  // Сворачивание таблицы
+  if (els.toggleTable && els.tableContent) {
+    els.toggleTable.addEventListener('click', () => {
+      const isHidden = els.tableContent.style.display === 'none';
+      els.tableContent.style.display = isHidden ? 'block' : 'none';
+      els.toggleTable.querySelector('span').textContent = isHidden ? '▲' : '▼';
+    });
+  }
+
+  // Калькулятора молярности
+  if (els.convertBtn) {
+    els.convertBtn.addEventListener('click', () => {
+      const ng = parseFloat(els.libConcNg.value) || 0;
+      const len = parseFloat(els.fragLength.value) || 0;
+      if (ng > 0 && len > 0) {
+        const nm = ngToNmol(ng, len);
+        els.resNm.textContent = `${nm} нМ`;
+        els.poolResult.style.display = 'block';
+      }
+    });
+  }
+  
+    if (els.diluteBtn) {
+    els.diluteBtn.addEventListener('click', () => {
+      const stockNmText = els.resNm?.textContent || "0 нМ";
+      const stockNm = parseFloat(stockNmText.replace(/[^0-9.]/g, '')) || 0;
+      
+      const targetNm = parseFloat(els.targetNm.value) || 0;
+      const stockVol = parseFloat(els.stockVol.value) || 0; // 🔑 новое поле
+      
+      if (stockNm <= 0 || targetNm <= 0 || stockVol <= 0) {
+        alert('Заполните все поля: молярность, целевую концентрацию и объём стока');
+        return;
+      }
+      
+      const res = calculateDilution(stockNm, targetNm, stockVol);
+      if (res && !res.error) {
+        els.resVolBuffer.textContent = res.bufferVolume;
+        els.resVolFinal.textContent = res.finalVolume;
+        els.resDilFactor.textContent = res.dilutionFactor + '×';
+        els.dilutionResult.style.display = 'block';
+      } else if (res?.error) {
+        alert(`${res.error}`);
+      }
+    });
+  }
+
+  // Калькулятор второго разведения (для GenoLab M / Геноскан 4000)
+  if (els.calcRunBtn) {
+    els.calcRunBtn.addEventListener('click', () => {
+      const targetPm = parseFloat(els.targetLoadingPm.value) || 0;
+      
+      if (targetPm > 0) {
+        // Формула: V_20pm = (Target_pM × 1500) / 20
+        // Итоговый объём всегда 1500 мкл
+        const vol20pm = (targetPm * 1500) / 20;
+        const volHyb = 1500 - vol20pm;
+        
+        els.resLibVol.textContent = Math.round(vol20pm * 10) / 10 + ' мкл';
+        els.resHybVol.textContent = Math.round(volHyb * 10) / 10 + ' мкл';
+        els.runPrepResult.style.display = 'block';
+      }
+    });
+  }
 
   // Инициализация по умолчанию
   els.platform.value = els.platform.options[0].value;
@@ -85,7 +189,7 @@ try {
       if (els.flowcell.options.length > 1) { els.flowcell.value = els.flowcell.options[1].value; updateCycles(); }
       setTimeout(() => {
         if (els.cycles.options.length > 1) { els.cycles.value = els.cycles.options[1].value; updateReadLengthPreview(); }
-        console.log('✅ Инициализация завершена успешно');
+        console.log('Инициализация завершена успешно');
       }, 50);
     }, 50);
   }, 50);
@@ -93,6 +197,7 @@ try {
   // --- Внутренние функции ---
   function updateInstruments() {
     const p = platforms[els.platform.value]; if (!p) return;
+    
     els.instrument.innerHTML = '<option value="">Выберите...</option>';
     els.flowcell.innerHTML = '<option value="">Сначала выберите инструмент</option>'; els.flowcell.disabled = true;
     els.cycles.disabled = true;
@@ -101,6 +206,33 @@ try {
       els.instrument.appendChild(opt);
     }
     els.instrument.disabled = false;
+
+    // Можно расширять: ['GenoLab M', 'NextSeq 2000', ...]
+    const instrumentsWithPrep = ['GenoLab M / Геноскан 4000'];
+    const selectedInstrument = els.instrument.value;
+    
+    if (els.runPrepCard) {
+      const showPrep = selectedInstrument && instrumentsWithPrep.includes(selectedInstrument);
+      els.runPrepCard.style.display = showPrep ? 'block' : 'none';
+      
+      // Обновляем заголовок карточки в зависимости от инструмента
+      if (showPrep && els.runPrepCard.querySelector('h3')) {
+        const platformName = p.name === 'GeneMind' ? 'GenoLab M / Геноскан 4000' : selectedInstrument;
+        els.runPrepCard.querySelector('h3').textContent = `Подготовка к запуску (${platformName})`;
+      }
+    }
+  }
+
+  function updatePrepCardVisibility() {
+    if (!els.runPrepCard) return;
+    const p = platforms[els.platform.value];
+    const instrumentsWithPrep = ['GenoLab M / Геноскан 4000'];
+    const showPrep = p && instrumentsWithPrep.includes(els.instrument.value);
+    els.runPrepCard.style.display = showPrep ? 'block' : 'none';
+    
+    if (showPrep && els.runPrepCard.querySelector('h3')) {
+      els.runPrepCard.querySelector('h3').textContent = `Подготовка к запуску (${els.instrument.value})`;
+    }
   }
 
   function updateFlowcells() {
@@ -137,53 +269,85 @@ try {
   }
 
   function calculate() {
-    const cyc = parseInt(els.cycles.value); const mode = els.mode.value;
-    const rawSize = parseFloat(els.targetSizeInput.value) || 0;
-    const unit = els.targetUnit.value;
-    const desiredCoverage = parseFloat(els.desiredCoverage.value) || null;
+    const cyc = parseInt(els.cycles.value) || 0;
+    const mode = els.mode.value;
+    const planMode = els.planMode?.value || 'size_cov';
+    const pctDup = parseFloat(els.pctDuplicates.value) || 0;
+    const pctQ30 = parseFloat(els.pctQ30.value) || 100;
 
     if (!cyc || !els.output) { if(els.output) els.output.style.display = 'none'; return; }
 
-    const fcName = els.flowcell.value; const p = platforms[els.platform.value];
-    const fc = p.instruments[els.instrument.value].flowcells[fcName]; if (!fc) return;
+    const fcName = els.flowcell.value;
+    const p = platforms[els.platform.value];
+    const fc = p.instruments[els.instrument.value].flowcells[fcName];
+    if (!fc) return;
 
-    const readsMillions = fc.reads_millions;
-    const totalGb = calculateGigabasesFromCycles(cyc, mode, readsMillions);
+    const totalGbRaw = calculateGigabasesFromCycles(cyc, mode, fc.reads_millions);
+    const effectiveGb = calculateEffectiveGb(totalGbRaw, pctDup, pctQ30);
     const readLen = getEffectiveReadLength(cyc, mode);
 
-    els.resTotalGb.textContent = totalGb + ' Гб';
-    els.resReadLen.textContent = readLen + ' п.н.';
+    // Собираем данные из активной панели
+    let inputs = {};
+    switch(planMode) {
+      case 'size_cov':
+        inputs = { size: parseFloat(els.panelSize.value), unit: els.panelSizeUnit.value, cov: parseFloat(els.panelCov.value) };
+        break;
+      case 'amplicons':
+        inputs = { ampCount: parseFloat(els.panelAmpCount.value), ampCov: parseFloat(els.panelAmpCov.value) };
+        break;
+      case 'data':
+        inputs = { size: parseFloat(els.panelDataSize.value), unit: els.panelDataUnit.value };
+        break;
+      case 'reads':
+        inputs = { reads: parseFloat(els.panelReads.value) };
+        break;
+    }
 
-    if (unit === 'Mreads') {
-      els.coverageGroup.style.display = 'none';
-      if (rawSize > 0) {
-        const samples = Math.floor(readsMillions / rawSize);
-        const rem = (readsMillions % rawSize).toFixed(1);
-        els.resGbPerSample.textContent = `${rawSize} млн ридов`;
-        els.resCoverageInput.textContent = '—';
-        els.resSamples.textContent = samples;
-        els.resRemaining.textContent = `${rem} млн ридов`;
-        els.reverseRow.style.display = 'none';
+    // Если ключевые поля пусты → прячем результат
+    const isEmpty = planMode === 'reads' ? !inputs.reads : 
+                    planMode === 'data' ? !inputs.size :
+                    planMode === 'amplicons' ? (!inputs.ampCount || !inputs.ampCov) :
+                    (!inputs.size || !inputs.cov);
+
+    if (isEmpty) { els.output.style.display = 'none'; return; }
+
+    // Единый расчёт
+    const res = calculateFromMode(planMode, inputs, effectiveGb, fc.reads_millions);
+
+    // Вывод
+    els.resTotalGb.textContent = totalGbRaw.toFixed(2) + ' Гб';
+    els.resEffectiveGb.textContent = effectiveGb.toFixed(2) + ' Гб';
+    els.resReadLen.textContent = readLen + ' п.н.';
+    els.resGbPerSample.textContent = res.usedPerSample;
+    els.resSamples.textContent = res.samples;
+    els.resRemaining.textContent = res.remaining;
+    
+    // Обратный расчёт покрытия
+    if (planMode === 'size_cov' && res.samples > 0) {
+      const size = parseFloat(els.panelSize.value) || 0;
+      const unit = els.panelSizeUnit.value;
+      const panelSizeGb = unit === 'Gb' ? size : size / 1000;
+
+      if (panelSizeGb > 0) {
+        const gbPerSample = effectiveGb / res.samples;
+        const actualCov = Math.round((gbPerSample / panelSizeGb) * 10) / 10;
+        els.reverseRow.style.display = 'block';
+        els.resCustomSamples.textContent = res.samples;
+        els.resAchievedCoverage.textContent = actualCov;
+      }
+    } else if (planMode === 'amplicons' && res.samples > 0) {
+      const ampCount = parseFloat(els.panelAmpCount.value) || 1;
+      const readsPerSample = parseFloat(res.usedPerSample) * 1_000_000 || 0;
+      if (readsPerSample > 0 && ampCount > 0) {
+        const actualCov = Math.round(readsPerSample / ampCount);
+        els.reverseRow.style.display = 'block';
+        els.resCustomSamples.textContent = res.samples;
+        els.resAchievedCoverage.textContent = actualCov;
       }
     } else {
-      els.coverageGroup.style.display = 'block';
-      if (rawSize > 0 && desiredCoverage && desiredCoverage > 0) {
-        const targetSizeGb = convertToGb(rawSize, unit, readLen, mode);
-        const { samples, gbPerSample, remainingGb } = calculateSampleCapacity(totalGb, targetSizeGb, desiredCoverage);
-        els.resGbPerSample.textContent = gbPerSample + ' Гб';
-        els.resCoverageInput.textContent = desiredCoverage;
-        els.resSamples.textContent = samples;
-        els.resRemaining.textContent = remainingGb + ' Гб';
-        if (samples > 0) {
-          els.resCustomSamples.textContent = samples;
-          els.resAchievedCoverage.textContent = calculateAchievedCoverage(totalGb, targetSizeGb, samples);
-          els.reverseRow.style.display = 'block';
-        } else { els.reverseRow.style.display = 'none'; }
-      } else {
-        els.resGbPerSample.textContent = '—'; els.resCoverageInput.textContent = '—';
-        els.resSamples.textContent = '—'; els.resRemaining.textContent = '—'; els.reverseRow.style.display = 'none';
-      }
+      els.reverseRow.style.display = 'none';
     }
+
     els.output.style.display = 'block';
   }
 
