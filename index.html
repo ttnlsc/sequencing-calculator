@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>NGS Calculator</title>
-      <style>
+  <style>
     :root {
       /* Базовая палитра */
       --bg-body: #f4f6f9; --bg-card: #ffffff; --text-main: #1f2937; --text-secondary: #6b7280;
@@ -13,20 +13,11 @@
       /* Градиент заголовка */
       --primary: #3b82f6; --primary-hover: #2563eb; --primary-end: #8b5cf6;
       
-      /* Единый синий стиль для блоков */
+      /* Единый синий стиль для блоков (результаты, молярность, запуск) */
       --blue-bg: #eff6ff; --blue-text: #1e40af; --blue-border: #bfdbfe;
       
       /* Размеры */
       --radius-lg: 16px; --radius-md: 10px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-body: #111827; --bg-card: #1f2937; --text-main: #f3f4f6; --text-secondary: #9ca3af;
-        --border: #374151; --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
-        --blue-bg: #172554; --blue-text: #93c5fd; --blue-border: #1e3a8a;
-      }
-      input, select { background: #374151 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
     }
 
     /* === БАЗОВЫЕ СТИЛИ === */
@@ -54,9 +45,6 @@
       background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); 
       background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; 
     }
-    @media (prefers-color-scheme: dark) { 
-      select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); } 
-    }
 
     .input-group { display: flex; gap: 0.5rem; }
     .input-group input { flex: 2; }
@@ -64,8 +52,8 @@
     .row { display: flex; gap: 1rem; }
     .row .form-group { flex: 1; margin-bottom: 0; }
 
-    /* === ЕДИНЫЙ СТИЛЬ БЛОКОВ (длина рида / результаты / молярность) === */
-    .read-length-box, .result, .pool-card {
+    /* === ЕДИНЫЙ СТИЛЬ БЛОКОВ (длина рида / результаты / молярность / запуск) === */
+    .read-length-box, .result, .pool-card, #run-prep-card {
       background: var(--blue-bg); color: var(--blue-text);
       border: 1px solid var(--blue-border); border-radius: var(--radius-md);
       padding: 0.8rem 1rem; margin-bottom: 1.5rem;
@@ -73,7 +61,9 @@
     .read-length-box { text-align: center; font-weight: 700; }
     .read-length-box small { font-weight: 400; font-size: 0.85em; opacity: 0.8; display: block; margin-top: 4px; }
     
-    .result h3, .pool-card h3 { margin: 0 0 1rem 0; font-size: 1.1rem; border-bottom: 1px solid var(--blue-border); padding-bottom: 0.5rem; }
+    .result h3, .pool-card h3, #run-prep-card h3 { 
+      margin: 0 0 1rem 0; font-size: 1.1rem; border-bottom: 1px solid var(--blue-border); padding-bottom: 0.5rem; 
+    }
     .result p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
     .result .highlight { font-size: 1.4rem; font-weight: 800; color: var(--primary); text-align: center; display: block; margin: 1rem 0; }
     .result small { opacity: 0.8; }
@@ -92,7 +82,6 @@
     /* === СПРАВОЧНАЯ ТАБЛИЦА === */
     .info-card { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 2rem; }
     .info-header { padding: 1rem 1.25rem; background: #f9fafb; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    @media (prefers-color-scheme: dark) { .info-header { background: #374151; border-color: #4b5563; } }
     
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 350px; }
@@ -101,17 +90,23 @@
     .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #e0e7ff; color: #3730a3; }
     .hint { font-size: 0.8em; color: var(--text-secondary); margin-top: 0.3rem; }
     
-    /* === КАЛЬКУЛЯТОР МОЛЯРНОСТИ — ДЕТАЛИ === */
-    .pool-card .result-box {
+    /* === ДЕТАЛИ КАЛЬКУЛЯТОРОВ (молярность / запуск) === */
+    .pool-card .result-box, #run-prep-card .result-box {
       background: rgba(255,255,255,0.6); border: 1px solid var(--blue-border);
       border-radius: 8px; padding: 1rem; margin-top: 1rem;
     }
-    .pool-card .result-box p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
-    .pool-card .result-value { font-weight: 700; color: var(--blue-text); }
-    .pool-card hr { border-color: var(--blue-border); margin: 1.5rem 0; }
-    .pool-card label { color: var(--blue-text); }
+    .pool-card .result-box p, #run-prep-card .result-box p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
+    .pool-card .result-value, #run-prep-card .result-value { font-weight: 700; color: var(--blue-text); }
+    .pool-card hr, #run-prep-card hr { border-color: var(--blue-border); margin: 1.5rem 0; }
+    .pool-card label, #run-prep-card label { color: var(--blue-text); }
     
-    /* Выравнивание полей и кнопки в молярности */
+    /* Памятка внутри карточек */
+    .pool-card > div[style*="background: #f9fafb"], 
+    #run-prep-card > div[style*="background: #f9fafb"] {
+      background: rgba(255,255,255,0.7) !important; border: 1px solid var(--blue-border) !important;
+    }
+    
+    /* Выравнивание полей в молярности */
     #pool-card-row { display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; }
     #pool-card-row .form-group { flex: 1; margin-bottom: 0 !important; }
     
@@ -119,13 +114,6 @@
       width: auto !important; min-width: 200px; margin: 0 auto 1rem !important;
       display: block !important; padding: 0.8rem 1.5rem !important; font-size: 1rem !important;
     }
-    
-    /* Кнопка "Рассчитать разведение" — идентична основной */
-    #diluteBtn {
-      background: var(--primary) !important; color: white !important;
-      box-shadow: 0 4px 6px rgba(37,99,235,0.3) !important; border: none !important;
-    }
-    #diluteBtn:hover { background: var(--primary-hover) !important; transform: translateY(-1px) !important; }
 
     /* === АНИМАЦИИ И ПАНЕЛИ === */
     .toggle-advanced { font-size: 0.9rem; color: var(--primary); cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; }
@@ -136,16 +124,49 @@
     .input-panel { display: none; margin-bottom: 1rem; }
     .input-panel.active { display: block; animation: slideDown 0.2s ease; }
 
-    /* === ТЁМНАЯ ТЕМА — ДОПОЛНИТЕЛЬНЫЕ ПРАВИЛА === */
+    /* === ТЁМНАЯ ТЕМА (ОБЪЕДИНЕННЫЙ БЛОК) === */
     @media (prefers-color-scheme: dark) {
-      .pool-card .result-box { background: rgba(0,0,0,0.2); }
-      .pool-card { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); }
-      .pool-card h3 { color: var(--text-main); border-bottom-color: var(--border); }
-      .pool-card label { color: var(--text-secondary); }
-      .pool-card .result-value { color: var(--primary); }
-      .pool-card hr { border-color: var(--border); }
-      #convertBtn { background: var(--primary) !important; color: white !important; }
-      #diluteBtn { background: var(--primary) !important; }
+      :root {
+        --bg-body: #111827; --bg-card: #1f2937; --text-main: #f3f4f6; --text-secondary: #9ca3af;
+        --border: #374151; --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+        --blue-bg: #172554; --blue-text: #93c5fd; --blue-border: #1e3a8a;
+      }
+      
+      input, select { background: #374151 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
+      
+      select { 
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); 
+      }
+      
+      .info-header { background: #374151; border-color: #4b5563; }
+      
+      /* Внутренние блоки карточек */
+      .pool-card .result-box, #run-prep-card .result-box { background: rgba(0,0,0,0.2); }
+      .pool-card > div[style*="background: #f9fafb"], 
+      #run-prep-card > div[style*="background: #f9fafb"] {
+        background: rgba(0,0,0,0.3) !important;
+      }
+      
+      /* Скроллбар таблицы */
+      .table-wrapper {
+        scrollbar-width: thin;
+        scrollbar-color: var(--blue-border) transparent;
+      }
+      .table-wrapper::-webkit-scrollbar { height: 6px; }
+      .table-wrapper::-webkit-scrollbar-thumb { background: var(--blue-border); border-radius: 3px; }
+    }
+
+    /* === МОБИЛЬНЫЕ УЛУЧШЕНИЯ (НЕЗАВИСИМЫЙ БЛОК) === */
+    @media (max-width: 600px) {
+      input, select { font-size: 1.1rem; padding: 0.9rem 1rem; }
+      button { padding: 1.1rem; font-size: 1.15rem; }
+      .card, .info-card, .pool-card, #run-prep-card { padding: 1.2rem; margin-bottom: 1.5rem; }
+      
+      @media (prefers-color-scheme: dark) {
+        body { color: #f9fafb; }
+        .text-secondary { color: #d1d5db !important; }
+        .card, .info-card { box-shadow: 0 2px 4px -1px rgba(0,0,0,0.4); }
+      }
     }
   </style>
 </head>
@@ -325,7 +346,7 @@
       
       <!-- Памятка по протоколу -->
       <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9em; border: 1px solid var(--blue-border);">
-        <b>1. Денатурация:</b> Смешайте 4 nM Lib (5 µL) + Denaturing Reagent (5 µL), инкубируйте 5 мин, добавьте Neutralizing Reagent (5 µL).<br>
+        <b>1. Денатурация:</b> Смешайте 4 nM библиотеки (5 µL) + 0.2M NaOH (5 µL), инкубируйте 5 мин, добавьте Neutralizing Reagent (5 µL).<br>
         <b>2. Первое разведение (до 20 pM):</b> Добавьте 985 µL Hybridization Reagent к денатурированной библиотеке.
       </div>
 
@@ -354,7 +375,7 @@
 
       <button id="calcRunBtn">Рассчитать второе разведение</button>
 
-      <div class="result-box" id="runPrepResult" style="display:none; margin-top: 1rem; background: rgba(255,255,255,0.6); border: 1px solid var(--blue-border); border-radius: 8px; padding: 1rem;">
+      <div class="result-box" id="runPrepResult" style="display:none; margin-top: 1rem;">
         <p><span>Объём 20 pM библиотеки:</span> <span class="result-value" id="res-lib-vol">— мкл</span></p>
         <p><span>Объём Hybridization Solution:</span> <span class="result-value" id="res-hyb-vol">— мкл</span></p>
         <p><span>Итоговый объём:</span> <span class="result-value">1500 мкл</span></p>
